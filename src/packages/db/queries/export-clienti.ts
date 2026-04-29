@@ -123,7 +123,7 @@ const PROVINCE_IT = new Set([
  * Per uso futuro: quando avremo il campo `provincia` nei guests,
  * questa funzione validerà la sigla italiana o restituirà "EE" per gli esteri.
  */
-export function normalizeProvincia(input: string | null | undefined, countryCode: string): string {
+function normalizeProvincia(input: string | null | undefined, countryCode: string): string {
   if (countryCode !== "IT") return "EE" // codice estero
   if (!input) return ""
   const code = input.trim().toUpperCase()
