@@ -214,15 +214,15 @@ export function RoomTypesManager({ propertyId, roomTypes }: Props) {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label>Cap. default</Label>
-                <Input type="number" {...form.register("default_capacity")} min={1} />
+                <Input type="number" {...form.register("default_capacity", { valueAsNumber: true })} min={1} />
               </div>
               <div className="space-y-1.5">
                 <Label>Cap. max</Label>
-                <Input type="number" {...form.register("max_capacity")} min={1} />
+                <Input type="number" {...form.register("max_capacity", { valueAsNumber: true })} min={1} />
               </div>
               <div className="space-y-1.5">
                 <Label>Prezzo base (€)</Label>
-                <Input type="number" step="0.01" {...form.register("base_price")} min={0} />
+                <Input type="number" step="0.01" {...form.register("base_price", { valueAsNumber: true })} min={0} />
               </div>
             </div>
 

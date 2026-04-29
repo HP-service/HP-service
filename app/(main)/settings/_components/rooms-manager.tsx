@@ -266,7 +266,7 @@ export function RoomsManager({ propertyId, rooms, roomTypes }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label>Piano</Label>
-                <Input type="number" {...form.register("floor")} placeholder="0" />
+                <Input type="number" {...form.register("floor", { setValueAs: (v) => v === "" || v === null || v === undefined ? undefined : Number(v) })} placeholder="0" />
               </div>
             </div>
 
