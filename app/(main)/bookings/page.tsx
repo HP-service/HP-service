@@ -92,8 +92,8 @@ export default async function BookingsPage({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-foreground">Prenotazioni</h1>
-          <p className="text-sm text-muted-foreground">{bookings.length} prenotazioni totali</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Prenotazioni</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{bookings.length} prenotazioni totali</p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <BookingsExport data={exportData} />
