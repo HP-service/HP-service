@@ -37,55 +37,31 @@ export async function completeSetup(input: SetupInput): Promise<
   } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: "Non autenticato" }
 
-  // Verifica che il profilo non abbia già una property (idempotenza)
-  const { data: existing } = await supabase
-    .from("profiles")
-    .select("property_id")
-    .eq("id", user.id)
-    .single()
+  // Chiama la funzione SECURITY DEFINER che bypassa RLS per il setup iniziale.
+  // Vedi: supabase-fix-onboarding.sql
+  const { data: propertyId, error: rpcErr } = await supabase.rpc("setup_property", {
+    p_name: data.name,
+    p_address: data.address,
+    p_city: data.city,
+    p_postal_code: data.postal_code,
+    p_province: data.province || "",
+    p_country: data.country || "IT",
+    p_vat_number: data.vat_number || "",
+    p_cin_code: data.cin_code || "",
+    p_phone: data.phone || "",
+    p_email: data.email || "",
+    p_full_name: data.full_name,
+  })
 
-  if (existing?.property_id) {
-    return { ok: true, propertyId: existing.property_id }
-  }
-
-  // Crea property
-  const { data: property, error: propErr } = await supabase
-    .from("properties")
-    .insert({
-      name: data.name,
-      address: data.address,
-      city: data.city,
-      postal_code: data.postal_code,
-      province: data.province || null,
-      country: data.country || "Italia",
-      vat_number: data.vat_number || null,
-      cin_code: data.cin_code || null,
-      phone: data.phone || null,
-      email: data.email || null,
-    })
-    .select("id")
-    .single()
-
-  if (propErr || !property) {
-    return { ok: false, error: propErr?.message || "Impossibile creare la struttura" }
-  }
-
-  // Aggiorna profilo: collega property + nome + ruolo Manager
-  const { error: profErr } = await supabase
-    .from("profiles")
-    .update({
-      property_id: property.id,
-      full_name: data.full_name,
-      role: "Manager",
-      is_active: true,
-      email: user.email ?? "",
-    })
-    .eq("id", user.id)
-
-  if (profErr) {
-    return { ok: false, error: profErr.message }
+  if (rpcErr || !propertyId) {
+    return {
+      ok: false,
+      error:
+        rpcErr?.message ??
+        "Impossibile creare la struttura. Hai eseguito supabase-fix-onboarding.sql?",
+    }
   }
 
   revalidatePath("/", "layout")
-  return { ok: true, propertyId: property.id }
+  return { ok: true, propertyId: propertyId as string }
 }
