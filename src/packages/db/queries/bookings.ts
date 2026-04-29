@@ -1,0 +1,374 @@
+"use server"
+
+import { createClient } from "@/lib/supabase/server"
+import { revalidatePath } from "next/cache"
+import { success, failure, type ActionResult } from "@utils/errors"
+import { canTransition, getRequiredFieldsForTransition } from "@db/functions/booking-state"
+import type { BookingStatus } from "@db/enums"
+
+// ============================================
+// Read
+// ============================================
+
+export async function getBookings(filters?: {
+  status?: BookingStatus
+  from?: string
+  to?: string
+  search?: string
+}) {
+  const supabase = await createClient()
+  let query = supabase
+    .from("bookings")
+    .select(`
+      *,
+      guest:guest_id (id, full_name, email, phone),
+      room_type:room_type_id (id, name, short_code),
+      room:room_id (id, name),
+      channel:channel_id (id, name, commission_rate)
+    `)
+    .order("check_in", { ascending: false })
+
+  if (filters?.status) {
+    query = query.eq("status", filters.status)
+  }
+  if (filters?.from) {
+    query = query.gte("check_in", filters.from)
+  }
+  if (filters?.to) {
+    query = query.lte("check_in", filters.to)
+  }
+  if (filters?.search) {
+    query = query.or(`guest.full_name.ilike.%${filters.search}%,booking_number.ilike.%${filters.search}%`)
+  }
+
+  const { data, error } = await query.limit(200)
+
+  if (error) return failure(error.message)
+  return success(data)
+}
+
+export async function getBooking(id: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`
+      *,
+      guest:guest_id (*),
+      room_type:room_type_id (*),
+      room:room_id (*),
+      channel:channel_id (*),
+      created_by_profile:created_by (full_name)
+    `)
+    .eq("id", id)
+    .single()
+
+  if (error) return failure(error.message)
+  return success(data)
+}
+
+export async function getTodayArrivals() {
+  const supabase = await createClient()
+  const today = new Date().toISOString().split("T")[0]
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`
+      *,
+      guest:guest_id (id, full_name),
+      room_type:room_type_id (id, name, short_code),
+      room:room_id (id, name)
+    `)
+    .eq("check_in", today)
+    .in("status", ["Confirmed", "CheckedIn"])
+    .order("created_at")
+
+  if (error) return failure(error.message)
+  return success(data)
+}
+
+export async function getTodayDepartures() {
+  const supabase = await createClient()
+  const today = new Date().toISOString().split("T")[0]
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(`
+      *,
+      guest:guest_id (id, full_name),
+      room:room_id (id, name)
+    `)
+    .eq("check_out", today)
+    .in("status", ["CheckedIn", "CheckedOut"])
+    .order("created_at")
+
+  if (error) return failure(error.message)
+  return success(data)
+}
+
+export async function getInHouseCount() {
+  const supabase = await createClient()
+  const { count, error } = await supabase
+    .from("bookings")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "CheckedIn")
+
+  if (error) return failure(error.message)
+  return success(count ?? 0)
+}
+
+/**
+ * Chiude automaticamente le prenotazioni rimaste CheckedIn con
+ * check_out < oggi. Libera la camera e marca `cleaning_status = 'Dirty'`.
+ *
+ * Regola hotel/B&B standard: l'ospite lascia la stanza entro il giorno
+ * di check_out. Se l'ops non ha chiuso manualmente, il giorno successivo
+ * la prenotazione viene considerata CheckedOut automaticamente.
+ *
+ * Idempotente: safe da chiamare ad ogni page load.
+ * Richiede la funzione Postgres `sweep_stale_checkins()`
+ * (vedi supabase/fix_auto_checkout_and_loyalty.sql).
+ */
+export async function sweepStaleCheckins(): Promise<number> {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.rpc("sweep_stale_checkins")
+    if (error) {
+      // Non bloccare l'UI se la funzione non esiste o fallisce
+      console.warn("[sweepStaleCheckins]", error.message)
+      return 0
+    }
+    return Array.isArray(data) ? data.length : 0
+  } catch (err) {
+    console.warn("[sweepStaleCheckins] exception", err)
+    return 0
+  }
+}
+
+// ============================================
+// Create
+// ============================================
+
+export async function createBooking(values: {
+  property_id: string
+  guest_id: string
+  room_type_id: string
+  room_id?: string | null
+  channel_id?: string | null
+  check_in: string
+  check_out: string
+  adults?: number
+  children?: number
+  total_amount?: number
+  has_early_check_in?: boolean
+  has_late_check_out?: boolean
+  special_requests?: string
+  internal_notes?: string
+  external_ref?: string
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .insert({
+      ...values,
+      booking_number: "", // auto-generated by trigger
+      created_by: user?.id,
+    })
+    .select()
+    .single()
+
+  if (error) return failure(error.message)
+  revalidatePath("/bookings")
+  revalidatePath("/planning")
+  revalidatePath("/dashboard")
+  return success(data)
+}
+
+// ============================================
+// Update
+// ============================================
+
+export async function updateBooking(
+  id: string,
+  values: Record<string, unknown>
+): Promise<ActionResult> {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from("bookings")
+    .update(values)
+    .eq("id", id)
+
+  if (error) return failure(error.message)
+  revalidatePath("/bookings")
+  revalidatePath("/planning")
+  revalidatePath("/dashboard")
+  return success(undefined)
+}
+
+// ============================================
+// Delete
+// ============================================
+
+/**
+ * Elimina una prenotazione. Hard delete: cancella anche folio/invoice_items
+ * correlati grazie ai vincoli ON DELETE CASCADE del DB.
+ *
+ * Nota: prenotazioni CheckedIn/CheckedOut non dovrebbero essere eliminate
+ * per integrità storica. In quei casi conviene usare `Cancelled` / `NoShow`.
+ */
+export async function deleteBooking(id: string): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // Safety: blocca eliminazione di prenotazioni "storiche"
+  const { data: booking, error: fetchErr } = await supabase
+    .from("bookings")
+    .select("status")
+    .eq("id", id)
+    .single()
+
+  if (fetchErr || !booking) return failure("Prenotazione non trovata")
+
+  if (booking.status === "CheckedIn" || booking.status === "CheckedOut") {
+    return failure(
+      "Non è possibile eliminare una prenotazione con check-in effettuato. Usa invece Cancella o No-show."
+    )
+  }
+
+  const { error } = await supabase.from("bookings").delete().eq("id", id)
+  if (error) return failure(error.message)
+
+  revalidatePath("/bookings")
+  revalidatePath("/planning")
+  revalidatePath("/dashboard")
+  return success(undefined)
+}
+
+// ============================================
+// Availability check (callable as server action)
+// ============================================
+
+export async function checkAvailabilityAction(
+  propertyId: string,
+  roomTypeId: string,
+  checkIn: string,
+  checkOut: string
+): Promise<ActionResult<number>> {
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("get_availability", {
+    p_property_id: propertyId,
+    p_room_type_id: roomTypeId,
+    p_check_in: checkIn,
+    p_check_out: checkOut,
+  })
+  if (error) return failure(error.message)
+  return success(data ?? 0)
+}
+
+export async function getAvailableRoomsForType(
+  propertyId: string,
+  roomTypeId: string,
+  checkIn: string,
+  checkOut: string
+) {
+  const supabase = await createClient()
+  // Get all rooms assigned to this type
+  const { data: assignments, error: aErr } = await supabase
+    .from("room_type_assignments")
+    .select("room_id, priority, rooms:room_id(id, name)")
+    .eq("room_type_id", roomTypeId)
+    .eq("is_active", true)
+    .order("priority")
+
+  if (aErr) return failure(aErr.message)
+
+  // Get booked room IDs in range
+  const { data: booked, error: bErr } = await supabase
+    .from("bookings")
+    .select("room_id")
+    .not("status", "in", '("Cancelled","NoShow")')
+    .not("room_id", "is", null)
+    .lte("check_in", checkOut)
+    .gte("check_out", checkIn)
+
+  if (bErr) return failure(bErr.message)
+
+  const bookedIds = new Set((booked ?? []).map((b) => b.room_id))
+  const available = (assignments ?? [])
+    .filter((a) => !bookedIds.has(a.room_id))
+    .map((a) => {
+      // Supabase può restituire array o oggetto per il join
+      const roomsRaw = a.rooms as unknown
+      const roomData = (Array.isArray(roomsRaw) ? roomsRaw[0] : roomsRaw) as { id: string; name: string } | null
+      return { id: a.room_id, name: roomData?.name ?? "" }
+    })
+
+  return success(available)
+}
+
+// Planning chart query
+export async function getBookingsForPlanning(startDate: string, endDate: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, room_id, room_type_id, check_in, check_out, status, booking_number, guest:guest_id(full_name), channel:channel_id(name)")
+    .not("status", "in", '("Cancelled","NoShow")')
+    .lte("check_in", endDate)
+    .gte("check_out", startDate)
+
+  if (error) return failure(error.message)
+  return success(data)
+}
+
+// ============================================
+// Status Transition
+// ============================================
+
+export async function changeBookingStatus(
+  id: string,
+  newStatus: BookingStatus,
+  extras?: { room_id?: string; cancellation_reason?: string }
+): Promise<ActionResult> {
+  const supabase = await createClient()
+
+  // Get current booking
+  const { data: booking, error: fetchErr } = await supabase
+    .from("bookings")
+    .select("status, room_id")
+    .eq("id", id)
+    .single()
+
+  if (fetchErr || !booking) return failure("Prenotazione non trovata")
+
+  // Validate transition
+  if (!canTransition(booking.status as BookingStatus, newStatus)) {
+    return failure(`Transizione da ${booking.status} a ${newStatus} non permessa`)
+  }
+
+  // Check required fields
+  const required = getRequiredFieldsForTransition(newStatus)
+  if (required.includes("room_id") && !booking.room_id && !extras?.room_id) {
+    return failure("Camera non assegnata. Assegna una camera prima del check-in.")
+  }
+  if (required.includes("cancellation_reason") && !extras?.cancellation_reason) {
+    return failure("Motivo di cancellazione obbligatorio")
+  }
+
+  // Perform update
+  const updateData: Record<string, unknown> = { status: newStatus }
+  if (extras?.room_id) updateData.room_id = extras.room_id
+  if (extras?.cancellation_reason) updateData.cancellation_reason = extras.cancellation_reason
+
+  const { error } = await supabase
+    .from("bookings")
+    .update(updateData)
+    .eq("id", id)
+
+  if (error) return failure(error.message)
+
+  revalidatePath("/bookings")
+  revalidatePath("/planning")
+  revalidatePath("/dashboard")
+  revalidatePath("/housekeeping")
+  return success(undefined)
+}
