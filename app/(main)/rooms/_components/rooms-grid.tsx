@@ -1,6 +1,9 @@
 "use client"
 
 import Link from "next/link"
+import { useTransition } from "react"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 import {
   CheckCircle2,
   AlertTriangle,
@@ -12,6 +15,7 @@ import {
   Wrench,
   Euro,
 } from "lucide-react"
+import { setRoomQuickState, type QuickRoomState } from "../_actions"
 
 type RoomTypeAssignment = {
   id: string
@@ -237,8 +241,9 @@ export function RoomsGrid({ rooms, inHouseMap }: Props) {
                 ""
 
               return (
-                <Link key={room.id} href={`/rooms/${room.id}`} className="block group">
+                <div key={room.id} className="group">
                   <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+                    <Link href={`/rooms/${room.id}`} className="block">
                     {/* Top color strip */}
                     <div className={`h-[6px] w-full ${sc.stripGradient}`} />
 
@@ -303,7 +308,7 @@ export function RoomsGrid({ rooms, inHouseMap }: Props) {
                       </div>
                     </div>
 
-                    {/* Footer: status + price/multi-type */}
+                    {/* Footer: status + multi-type */}
                     <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                       <span
                         className={`inline-flex items-center gap-1 text-[10px] font-bold ${sc.text}`}
@@ -325,13 +330,92 @@ export function RoomsGrid({ rooms, inHouseMap }: Props) {
                         </span>
                       )}
                     </div>
+                    </Link>
+                    {/* Quick housekeeping actions */}
+                    <QuickActions
+                      roomId={room.id}
+                      effectiveStatus={effectiveStatus}
+                      cleaningStatus={room.cleaning_status}
+                    />
                   </div>
-                </Link>
+                </div>
               )
             })}
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function QuickActions({
+  roomId,
+  effectiveStatus,
+  cleaningStatus,
+}: {
+  roomId: string
+  effectiveStatus: string
+  cleaningStatus: string
+}) {
+  const router = useRouter()
+  const [isPending, startTransition] = useTransition()
+
+  function set(next: QuickRoomState | "Available") {
+    startTransition(async () => {
+      const res = await setRoomQuickState(roomId, next)
+      if (!res.ok) {
+        toast.error(res.error)
+      } else {
+        toast.success("Aggiornato")
+        router.refresh()
+      }
+    })
+  }
+
+  const isMaintenance = effectiveStatus === "Maintenance" || effectiveStatus === "OutOfOrder"
+
+  return (
+    <div className="grid grid-cols-3 border-t border-slate-100 bg-white text-[10px] font-bold uppercase tracking-wider">
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => set("Clean")}
+        title="Segna come pulita"
+        className={`flex items-center justify-center gap-1 py-2 transition-colors hover:bg-emerald-50 disabled:opacity-50 ${
+          cleaningStatus === "Clean" && !isMaintenance
+            ? "bg-emerald-50 text-emerald-700"
+            : "text-slate-500"
+        }`}
+      >
+        <CheckCircle2 className="h-3 w-3" />
+        Pulita
+      </button>
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => set("Dirty")}
+        title="Segna come da pulire"
+        className={`flex items-center justify-center gap-1 border-x border-slate-100 py-2 transition-colors hover:bg-amber-50 disabled:opacity-50 ${
+          cleaningStatus === "Dirty" && !isMaintenance
+            ? "bg-amber-50 text-amber-700"
+            : "text-slate-500"
+        }`}
+      >
+        <AlertTriangle className="h-3 w-3" />
+        Sporca
+      </button>
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => set(isMaintenance ? "Available" : "Maintenance")}
+        title={isMaintenance ? "Esci dalla manutenzione" : "Imposta in manutenzione"}
+        className={`flex items-center justify-center gap-1 py-2 transition-colors hover:bg-rose-50 disabled:opacity-50 ${
+          isMaintenance ? "bg-rose-50 text-rose-700" : "text-slate-500"
+        }`}
+      >
+        <Wrench className="h-3 w-3" />
+        {isMaintenance ? "Riapri" : "Manut."}
+      </button>
     </div>
   )
 }

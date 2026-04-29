@@ -8,7 +8,6 @@ import {
   BookOpen,
   BedDouble,
   KeyRound,
-  Sparkles,
   Users,
   ShieldCheck,
   BarChart3,
@@ -47,7 +46,6 @@ const GROUPS: Group[] = [
       { href: "/bookings", label: "Prenotazioni", icon: BookOpen },
       { href: "/rooms", label: "Camere", icon: BedDouble },
       { href: "/check-in", label: "Check-in", icon: KeyRound },
-      { href: "/tasks", label: "Pulizie", icon: Sparkles },
     ],
   },
   {
@@ -75,7 +73,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/ical", label: "iCal Sync", icon: RefreshCw },
       { href: "/scraping", label: "Competitor", icon: LineChart },
-      { href: "/portale", label: "Portale Ospiti", icon: MessageCircle },
+      { href: "/info-ospiti", label: "Info Ospiti", icon: MessageCircle },
     ],
   },
   {
