@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       .gte("submitted_at", start + "T00:00:00")
       .lte("submitted_at", end + "T23:59:59")
     for (const a of data ?? []) {
-      const b = a.bookings as { booking_number: string; guests: { full_name: string } | null } | null
+      const b = a.bookings as unknown as { booking_number: string; guests: { full_name: string } | null } | null
       rows.push([
         new Date(a.submitted_at).toLocaleDateString("it-IT"),
         "Alloggiati Web",
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
       .gte("date", start)
       .lte("date", end)
     for (const t of data ?? []) {
-      const folio = t.folio as {
+      const folio = t.folio as unknown as {
         folio_number: string
         booking: { guests: { full_name: string } | null } | null
       } | null

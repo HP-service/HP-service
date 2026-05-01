@@ -119,7 +119,7 @@ export default async function ArchivioPage({
   const docs: DocRow[] = []
 
   for (const a of allogRes.data ?? []) {
-    const b = a.bookings as { booking_number: string; guests: { full_name: string } | null } | null
+    const b = a.bookings as unknown as { booking_number: string; guests: { full_name: string } | null } | null
     docs.push({
       id: a.id,
       kind: "alloggiati",
@@ -163,7 +163,7 @@ export default async function ArchivioPage({
   }
 
   for (const t of txRes.data ?? []) {
-    const folio = t.folio as {
+    const folio = t.folio as unknown as {
       folio_number: string
       booking: { id: string; booking_number: string; guests: { full_name: string } | null } | null
     } | null

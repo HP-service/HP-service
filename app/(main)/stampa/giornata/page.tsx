@@ -72,9 +72,9 @@ export default async function StampaGiornataPage({
             headers={["#", "Ospite", "Camera", "Pax", "Canale", "Telefono", "Note"]}
             rows={
               arrivi?.map((b) => {
-                const g = b.guests as { full_name: string; phone: string | null } | null
-                const r = b.rooms as { name: string } | null
-                const ch = b.channels as { name: string } | null
+                const g = b.guests as unknown as { full_name: string; phone: string | null } | null
+                const r = b.rooms as unknown as { name: string } | null
+                const ch = b.channels as unknown as { name: string } | null
                 return [
                   b.booking_number,
                   g?.full_name ?? "—",
@@ -95,8 +95,8 @@ export default async function StampaGiornataPage({
             headers={["#", "Ospite", "Camera", "Telefono", "Saldo"]}
             rows={
               partenze?.map((b) => {
-                const g = b.guests as { full_name: string; phone: string | null } | null
-                const r = b.rooms as { name: string } | null
+                const g = b.guests as unknown as { full_name: string; phone: string | null } | null
+                const r = b.rooms as unknown as { name: string } | null
                 return [
                   b.booking_number,
                   g?.full_name ?? "—",
@@ -115,8 +115,8 @@ export default async function StampaGiornataPage({
             headers={["#", "Ospite", "Camera", "Telefono", "Check-out"]}
             rows={
               inCasa?.map((b) => {
-                const g = b.guests as { full_name: string; phone: string | null } | null
-                const r = b.rooms as { name: string } | null
+                const g = b.guests as unknown as { full_name: string; phone: string | null } | null
+                const r = b.rooms as unknown as { name: string } | null
                 return [
                   b.booking_number,
                   g?.full_name ?? "—",

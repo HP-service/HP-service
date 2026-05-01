@@ -39,7 +39,7 @@ export default async function StampaPuliziePage({
   const partenzeByRoom = new Map<string, string>()
   for (const p of partenze ?? []) {
     if (p.room_id) {
-      const g = p.guests as { full_name: string } | null
+      const g = p.guests as unknown as { full_name: string } | null
       partenzeByRoom.set(p.room_id, g?.full_name ?? "Ospite")
     }
   }

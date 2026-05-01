@@ -56,7 +56,10 @@ const GROUPS: Group[] = [
   },
   {
     title: "CRM",
-    items: [{ href: "/guests", label: "Ospiti", icon: Users }],
+    items: [
+      { href: "/guests", label: "Ospiti", icon: Users },
+      { href: "/messaggi", label: "Messaggi", icon: Mail },
+    ],
   },
   {
     title: "Compliance",
@@ -71,6 +74,7 @@ const GROUPS: Group[] = [
     title: "Finance",
     items: [
       { href: "/finance", label: "Finanze", icon: TrendingUp },
+      { href: "/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/finance/expenses", label: "Spese", icon: ReceiptText },
       { href: "/finance/export-clienti", label: "Export Fatture", icon: FileSpreadsheet },
     ],

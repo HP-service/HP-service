@@ -16,6 +16,10 @@ import { BookingActions } from "./_components/booking-actions"
 import { BookingEditDelete } from "./_components/booking-edit-delete"
 import { FolioSection } from "./_components/folio-section"
 import { GuestAccessCodeCard } from "./_components/guest-access-code"
+import { PreCheckinCard } from "./_components/precheckin-card"
+import { SendMessageButton } from "./_components/send-message-button"
+import { listTemplates } from "@/app/(main)/messaggi/_actions"
+import { getProperty } from "@db/queries/settings"
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
   Inquiry:    "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -28,10 +32,12 @@ const STATUS_BADGE_CLASSES: Record<string, string> = {
 
 export default async function BookingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const [bookingResult, folioResult, roomsResult] = await Promise.all([
+  const [bookingResult, folioResult, roomsResult, templatesResult, propertyResult] = await Promise.all([
     getBooking(id),
     getFolioForBooking(id),
     getRooms(),
+    listTemplates(),
+    getProperty(),
   ])
 
   if (bookingResult.error || !bookingResult.data) notFound()
@@ -87,6 +93,28 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
             {booking.check_in} → {booking.check_out} · {booking.nights} notti
           </p>
         </div>
+        <SendMessageButton
+          templates={templatesResult.data ?? []}
+          guestEmail={guest?.email}
+          guestPhone={guest?.phone}
+          vars={{
+            guest_name: guest?.full_name,
+            property_name: propertyResult.data?.name,
+            property_address: propertyResult.data?.address ?? undefined,
+            property_phone: propertyResult.data?.phone ?? undefined,
+            check_in: new Date(booking.check_in).toLocaleDateString("it-IT"),
+            check_out: new Date(booking.check_out).toLocaleDateString("it-IT"),
+            check_in_time: propertyResult.data?.check_in_time?.slice(0, 5) ?? "15:00",
+            check_out_time: propertyResult.data?.check_out_time?.slice(0, 5) ?? "11:00",
+            nights: String(booking.nights),
+            booking_number: booking.booking_number,
+            total_amount: Number(booking.total_amount ?? 0).toFixed(2),
+            access_code: booking.guest_access_code ?? undefined,
+            precheckin_link: (booking as { pre_checkin_token?: string | null }).pre_checkin_token
+              ? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/pre-checkin/${(booking as { pre_checkin_token?: string | null }).pre_checkin_token}`
+              : undefined,
+          }}
+        />
         <BookingEditDelete
           bookingId={booking.id}
           bookingNumber={booking.booking_number}
@@ -209,6 +237,16 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
               bookingId={booking.id}
               accessCode={booking.guest_access_code}
               roomName={room?.name}
+            />
+          )}
+
+          {/* Pre Check-in Digitale (visible for Confirmed or Inquiry bookings) */}
+          {(booking.status === "Confirmed" || booking.status === "Inquiry") && (
+            <PreCheckinCard
+              bookingId={booking.id}
+              bookingNumber={booking.booking_number}
+              hasToken={!!(booking as { pre_checkin_token?: string | null }).pre_checkin_token}
+              existingToken={(booking as { pre_checkin_token?: string | null }).pre_checkin_token}
             />
           )}
 

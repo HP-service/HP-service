@@ -68,13 +68,13 @@ export default async function StampaInCasaPage() {
             </tr>
           ) : (
             bookings!.map((b) => {
-              const g = b.guests as {
+              const g = b.guests as unknown as {
                 full_name: string
                 phone: string | null
                 email: string | null
                 nationality: string | null
               } | null
-              const r = b.rooms as { name: string } | null
+              const r = b.rooms as unknown as { name: string } | null
               return (
                 <tr key={b.id} className="border-b border-slate-200">
                   <td className="px-2 py-1.5 font-bold text-slate-900">
