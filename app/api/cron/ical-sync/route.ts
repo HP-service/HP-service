@@ -9,8 +9,18 @@ import { parseIcal } from "@ical/parser"
  * Schedule: every 15 minutes via Vercel Cron or external cron service.
  */
 export async function GET(request: NextRequest) {
-  const secret = request.nextUrl.searchParams.get("secret")
-  if (secret !== process.env.CRON_SECRET) {
+  // Vercel Cron usa l'header `Authorization: Bearer <CRON_SECRET>` automaticamente.
+  // Supportiamo anche `?secret=` per chiamate manuali.
+  const expected = process.env.CRON_SECRET
+  if (!expected) {
+    return NextResponse.json(
+      { error: "CRON_SECRET non configurato" },
+      { status: 500 },
+    )
+  }
+  const fromHeader = request.headers.get("authorization") === `Bearer ${expected}`
+  const fromQuery = request.nextUrl.searchParams.get("secret") === expected
+  if (!fromHeader && !fromQuery) {
     return NextResponse.json({ error: "Non autorizzato" }, { status: 401 })
   }
 

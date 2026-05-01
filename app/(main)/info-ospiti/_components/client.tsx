@@ -23,9 +23,9 @@ import {
 import {
   upsertInfoPage,
   deleteInfoPage,
-  TEMPLATES,
   type InfoPage,
 } from "../_actions"
+import { TEMPLATES } from "../_templates"
 import { useRouter } from "next/navigation"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {

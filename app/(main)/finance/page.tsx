@@ -9,6 +9,7 @@ import {
   ReceiptText, Euro, FileSpreadsheet
 } from "lucide-react"
 import { FinanceExport } from "./_components/finance-export"
+import { FinanceTrendChart, type TrendPoint } from "./_components/trend-chart"
 
 function formatEur(value: number) {
   return "€ " + Math.round(value).toLocaleString("it-IT")
@@ -25,10 +26,29 @@ export default async function FinancePage({
   const now = new Date()
   const currentMonth = month ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
-  const [statsResult, txnsResult] = await Promise.all([
+  // Carica gli ultimi 6 mesi per il trend chart
+  const last6: string[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    last6.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
+  }
+
+  const [statsResult, txnsResult, trendStats] = await Promise.all([
     getFinanceStats(currentMonth),
     getTransactions(50),
+    Promise.all(last6.map((m) => getFinanceStats(m))),
   ])
+
+  const trend: TrendPoint[] = last6.map((m, i) => {
+    const s = trendStats[i]?.data
+    const d = new Date(m + "-01")
+    return {
+      month: m,
+      label: d.toLocaleDateString("it-IT", { month: "short" }),
+      revenue: Math.round(s?.netRevenue ?? 0),
+      expenses: Math.round(s?.expenses ?? 0),
+    }
+  })
 
   const stats = statsResult.data
   const txns = txnsResult.data ?? []
@@ -86,8 +106,8 @@ export default async function FinancePage({
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-foreground capitalize">Finanze</h1>
-          <p className="text-sm text-muted-foreground capitalize">Overview finanziaria · {monthLabel}</p>
+          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 capitalize">Finanze</h1>
+          <p className="text-sm text-slate-500 mt-0.5 capitalize">Overview finanziaria · {monthLabel}</p>
         </div>
         <div className="flex items-center gap-2">
           <FinanceExport data={exportData} />
@@ -177,6 +197,27 @@ export default async function FinancePage({
           <p className={`text-3xl font-black ${grossProfit >= 0 ? "text-emerald-800" : "text-orange-800"}`}>{formatEur(grossProfit)}</p>
           <p className={`text-xs mt-0.5 ${grossProfit >= 0 ? "text-emerald-500" : "text-orange-400"}`}>{monthLabel}</p>
         </div>
+      </div>
+
+      {/* Trend chart */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-800">
+              Andamento ultimi 6 mesi
+            </p>
+            <p className="text-xs text-slate-500">Entrate vs spese</p>
+          </div>
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-indigo-500" /> Entrate
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-rose-500" /> Spese
+            </span>
+          </div>
+        </div>
+        <FinanceTrendChart data={trend} />
       </div>
 
       {/* P&L Summary */}
