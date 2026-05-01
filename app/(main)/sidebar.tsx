@@ -23,6 +23,11 @@ import {
   LogOut,
   X,
   Building2,
+  Archive,
+  Printer,
+  Mail,
+  Star,
+  Wrench,
 } from "lucide-react"
 import { useSession } from "@auth/client"
 import { signOut } from "@auth/server"
@@ -46,6 +51,7 @@ const GROUPS: Group[] = [
       { href: "/bookings", label: "Prenotazioni", icon: BookOpen },
       { href: "/rooms", label: "Camere", icon: BedDouble },
       { href: "/check-in", label: "Check-in", icon: KeyRound },
+      { href: "/stampa", label: "Stampe rapide", icon: Printer },
     ],
   },
   {
@@ -58,6 +64,7 @@ const GROUPS: Group[] = [
       { href: "/alloggiati", label: "Alloggiati Web", icon: ShieldCheck },
       { href: "/istat", label: "ISTAT", icon: BarChart3 },
       { href: "/tassa-soggiorno", label: "Tassa Soggiorno", icon: Receipt },
+      { href: "/archivio", label: "Archivio Documenti", icon: Archive },
     ],
   },
   {
